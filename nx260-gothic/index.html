@@ -8,7 +8,7 @@
 <title>NX260 Gothic Sanctum</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&family=UnifrakturMaguntia&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&family=UnifrakturMaguntia&family=Amiri:ital,wght@1,700&display=swap">
 <style>
 /* Layout: full-bleed WebGL nave; a reliquary-style control panel docked right, becoming a bottom sheet on phones */
 :root {
@@ -30,6 +30,14 @@ html { height: 100%; box-sizing: border-box; background: var(--bg); }
 body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--f-ui); font-size: 15px; line-height: 1.4; }
 [hidden] { display: none !important; }
 #app { position: relative; height: 100%; overflow: hidden; }
+/* Andalusian profile: zellige-glaze teal accent and a Naskh-derived display italic */
+#app[data-profile="andalusi"] {
+  --line: rgba(74, 184, 160, 0.26);
+  --gold: #4ab8a0;
+  --gold-ink: #04201b;
+  --f-display: "Amiri", "Times New Roman", serif;
+}
+#app[data-profile="andalusi"] h1 { font-style: italic; font-weight: 700; font-size: 38px; }
 #scene { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; outline: none; }
 #scene.dragging { cursor: grabbing; }
 
@@ -59,6 +67,10 @@ h2 { margin: 0; font: 500 11px/1 var(--f-mono); letter-spacing: 0.16em; text-tra
 .txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .txt b { font-weight: 700; font-size: 15px; }
 .txt small { color: var(--muted); font-size: 13px; line-height: 1.3; }
+.txt .print { font: 400 11.5px/1.45 var(--f-mono); color: var(--ink); opacity: 0.78; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.view { font: 500 12px/1 var(--f-ui); color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 3px; padding: 5px 7px; cursor: pointer; margin-top: 1px; }
+.view:hover { color: var(--gold); border-color: var(--gold); }
+.view:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 kbd { font: 500 11px/1 var(--f-mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 3px 5px; margin-top: 2px; }
 .sw { width: 34px; height: 18px; border-radius: 9px; background: var(--off); position: relative; margin-top: 2px; transition: background 0.2s; }
 .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform 0.2s, background 0.2s; }
@@ -77,6 +89,7 @@ input:focus-visible + .sw { outline: 2px solid var(--gold); outline-offset: 2px;
 .btn.grow { flex: 1 1 0; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .seg button { font: 500 13px/1 var(--f-ui); color: var(--ink); background: transparent; border: 0; padding: 9px 4px; cursor: pointer; }
+.seg.two { grid-template-columns: repeat(2, 1fr); }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--gold); color: var(--gold-ink); }
 
@@ -133,12 +146,21 @@ input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid v
   <aside id="panel" aria-label="Scene controls">
     <header>
       <span class="eyebrow">Antec NX260</span>
-      <h1>Sanctum</h1>
+      <h1 id="title">Sanctum</h1>
       <p class="spec">ATX mid-tower · 379 × 215 × 448 mm (D×W×H)<br>3 × 120 mm ARGB front fans · tempered glass side<br><a href="https://www.antec.com/product/case/nx260" target="_blank" rel="noopener">antec.com/product/case/nx260</a></p>
     </header>
 
+    <section aria-labelledby="h-style">
+      <h2 id="h-style">Style</h2>
+      <div class="seg two" role="group" aria-label="Decoration style" id="profileSeg">
+        <button type="button" data-profile="gothic" aria-pressed="true">Gothic</button>
+        <button type="button" data-profile="andalusi" aria-pressed="false">Andalusian</button>
+      </div>
+    </section>
+
     <section aria-labelledby="h-gothic">
       <h2 id="h-gothic">Gothic additions</h2>
+      <p class="help" id="printNote" hidden>Sizes are at the case's real scale. Each part has a flat back, overhangs of 45° or less, and fits a 256 mm print bed (larger parts are split into tiles).</p>
       <div class="parts" id="partList"></div>
       <div class="row">
         <button class="btn grow" id="stripAll" type="button">Strip to stock case</button>
@@ -156,7 +178,7 @@ input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid v
 
     <section aria-labelledby="h-cam">
       <h2 id="h-cam">Camera</h2>
-      <div class="seg" role="group" aria-label="Camera mode">
+      <div class="seg" role="group" aria-label="Camera mode" id="modeSeg">
         <button type="button" data-mode="orbit" aria-pressed="true">Orbit</button>
         <button type="button" data-mode="roam" aria-pressed="false">Roam</button>
         <button type="button" data-mode="tour" aria-pressed="false">Tour</button>
@@ -169,7 +191,7 @@ input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid v
         <button class="btn" type="button" data-view="low">Low</button>
         <button class="btn" type="button" data-view="inside">Inside</button>
       </div>
-      <p class="help">Roam: drag to look, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move, <kbd>E</kbd>/<kbd>Q</kbd> to rise and sink, hold <kbd>Shift</kbd> to go faster. Pressing a move key in Orbit switches to Roam. <kbd>G</kbd> strips or restores everything; <kbd>1</kbd>–<kbd>8</kbd> toggle single parts.</p>
+      <p class="help">Roam: drag to look, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move, <kbd>E</kbd>/<kbd>Q</kbd> to rise and sink, hold <kbd>Shift</kbd> to go faster. Pressing a move key in Orbit switches to Roam. <kbd>G</kbd> strips or restores everything, <kbd>1</kbd>–<kbd>8</kbd> toggle parts in list order, and <kbd>P</kbd> switches style.</p>
     </section>
 
     <section aria-labelledby="h-air">
@@ -383,6 +405,44 @@ function stainedTexture() {
   });
 }
 
+// Carved stucco (yesería): interlaced circles with four-petal flowers. Drawn twice: colour map and bump map.
+function drawArabesque(g, w) {
+  g.fillStyle = '#e9dcc2'; g.fillRect(0, 0, w, w);
+  const s = w / 4;
+  g.strokeStyle = '#9c8762'; g.lineWidth = 3;
+  for (let i = -1; i <= 4; i++) for (let j = -1; j <= 4; j++) { g.beginPath(); g.arc(i * s, j * s, s * 0.72, 0, Math.PI * 2); g.stroke(); }
+  g.fillStyle = '#c4af86';
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) for (let k = 0; k < 4; k++) {
+    g.beginPath(); g.ellipse((i + 0.5) * s, (j + 0.5) * s, s * 0.17, s * 0.06, k * Math.PI / 4, 0, Math.PI * 2); g.fill();
+  }
+}
+const arabesqueTex = canvasTex(256, 256, drawArabesque, { repeat: [4, 4] });
+const arabesqueBump = canvasTex(256, 256, drawArabesque, { repeat: [4, 4], srgb: false });
+
+// Zellige: star-and-cross mosaic, 2 × 2 stars per tile so the four glaze colours wrap seamlessly
+const zelligeTex = canvasTex(256, 256, (g, w) => {
+  const a = w / 2, ro = a / 2, ri = ro * 0.7654, cols = ['#1f6f4a', '#1d3f7a', '#c8892a', '#1b1b1d'];
+  g.fillStyle = '#efe8da'; g.fillRect(0, 0, w, w);
+  for (let i = -1; i <= 2; i++) for (let j = -1; j <= 2; j++) {
+    g.beginPath();
+    for (let k = 0; k < 16; k++) { const an = k * Math.PI / 8, r = k % 2 ? ri : ro, x = i * a + Math.cos(an) * r, y = j * a + Math.sin(an) * r; if (k) g.lineTo(x, y); else g.moveTo(x, y); }
+    g.closePath(); g.fillStyle = cols[((i % 2 + 2) % 2) * 2 + ((j % 2 + 2) % 2)]; g.fill();
+    g.lineWidth = 4; g.strokeStyle = '#2a2622'; g.stroke();
+  }
+  for (const [x, y] of [[a / 2, a / 2], [a * 1.5, a / 2], [a / 2, a * 1.5], [a * 1.5, a * 1.5]]) {
+    g.beginPath(); for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4 + Math.PI / 8; g.lineTo(x + Math.cos(an) * ro * 0.24, y + Math.sin(an) * ro * 0.24); }
+    g.closePath(); g.fillStyle = '#1b1b1d'; g.fill();
+  }
+});
+
+// Pierced brass for the lanterns (white = metal, black = hole)
+const piercedTex = canvasTex(64, 128, (g, w, h) => {
+  g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.fillStyle = '#000';
+  const star = (x, y, r) => { g.beginPath(); for (let k = 0; k < 16; k++) { const an = k * Math.PI / 8, rr = k % 2 ? r * 0.55 : r; g.lineTo(x + Math.cos(an) * rr, y + Math.sin(an) * rr); } g.closePath(); g.fill(); };
+  star(32, 32, 13); star(32, 96, 13);
+  for (const [x, y] of [[4, 64], [60, 64], [32, 64], [4, 4], [60, 4], [4, 124], [60, 124]]) { g.beginPath(); g.arc(x, y, 4, 0, Math.PI * 2); g.fill(); }
+}, { srgb: false });
+
 // ---------------------------------------------------------------------------
 // Materials
 // ---------------------------------------------------------------------------
@@ -412,6 +472,24 @@ const M = {
   ember: new THREE.MeshBasicMaterial({ color: 0xff3a1c }),
   lanternGlow: new THREE.MeshBasicMaterial({ color: 0xffb35a }),
   flame: new THREE.MeshBasicMaterial({ color: 0xffd08a }),
+};
+// Andalusian palette: stucco, ablaq voussoirs, Macael-white marble, red tapial, cedar, glazed tile, brass
+const A = {
+  stucco: new THREE.MeshStandardMaterial({ color: 0xffffff, map: arabesqueTex, bumpMap: arabesqueBump, bumpScale: 2, roughness: 0.85 }),
+  plaster: new THREE.MeshStandardMaterial({ color: 0xece2cc, map: stoneTex, roughness: 0.9 }),
+  plasterDS: new THREE.MeshStandardMaterial({ color: 0xece2cc, map: stoneTex, roughness: 0.9, side: THREE.DoubleSide }),
+  blueDS: new THREE.MeshStandardMaterial({ color: 0x9fb2d6, map: stoneTex, roughness: 0.85, side: THREE.DoubleSide }),
+  red: new THREE.MeshStandardMaterial({ color: 0xa4442f, map: stoneTex, roughness: 0.85 }),
+  cream: new THREE.MeshStandardMaterial({ color: 0xead9b0, map: stoneTex, roughness: 0.85 }),
+  marble: new THREE.MeshStandardMaterial({ color: 0xf2ede4, roughness: 0.3 }),
+  tapial: new THREE.MeshStandardMaterial({ color: 0xbc6a4c, map: stoneTex, roughness: 0.95 }),
+  brick: new THREE.MeshStandardMaterial({ color: 0xd8916a, map: stoneTex, roughness: 0.85 }),
+  cedar: new THREE.MeshStandardMaterial({ color: 0x7a4a2a, roughness: 0.62 }),
+  glazeGreen: new THREE.MeshStandardMaterial({ color: 0x1f6f4a, roughness: 0.2, metalness: 0.05 }),
+  brass: new THREE.MeshStandardMaterial({ color: 0xc19a45, metalness: 0.92, roughness: 0.3 }),
+  pierced: new THREE.MeshStandardMaterial({ color: 0xc19a45, metalness: 0.92, roughness: 0.3, alphaMap: withRepeat(piercedTex, 8, 1), alphaTest: 0.5, side: THREE.DoubleSide }),
+  gold: new THREE.MeshStandardMaterial({ color: 0xd4a94a, metalness: 0.9, roughness: 0.3 }),
+  lampGlow: new THREE.MeshBasicMaterial({ color: 0xffc070 }),
 };
 
 // ---------------------------------------------------------------------------
@@ -651,9 +729,9 @@ const glass = new THREE.Group(); scene.add(glass);
 // Removable parts system
 // ---------------------------------------------------------------------------
 const PARTS = [];
-function defPart(id, name, desc, dir, mode = 'grow') {
+function defPart(id, name, desc, dir, extra = {}) {
   const root = new THREE.Group(); root.name = id; scene.add(root);
-  const p = { id, name, desc, root, dir, mode, pieces: [], lights: [], on: true };
+  const p = { id, name, desc, root, dir, mode: 'grow', profile: 'gothic', pieces: [], lights: [], on: true, want: true, ...extra };
   PARTS.push(p); return p;
 }
 function addPiece(p, obj, dir) {
@@ -665,10 +743,10 @@ function addPiece(p, obj, dir) {
   p.root.add(obj); p.pieces.push(obj);
   return obj;
 }
-function setPart(p, on, instant = false) {
+function setPart(p, on, instant = false, delay = 0) {
   p.on = on;
   const n = p.pieces.length, step = Math.min(0.07, 0.55 / Math.max(1, n));
-  p.pieces.forEach((o, i) => { o.userData.wait = instant || reduceMotion ? 0 : (on ? i : n - 1 - i) * step; if (instant || reduceMotion) o.userData.v = on ? 1 : 0; });
+  p.pieces.forEach((o, i) => { o.userData.wait = instant || reduceMotion ? 0 : delay + (on ? i : n - 1 - i) * step; if (instant || reduceMotion) o.userData.v = on ? 1 : 0; });
   const input = document.getElementById('p-' + p.id); if (input) input.checked = on;
 }
 const DUR = 0.75;
@@ -915,6 +993,7 @@ function buttress(L = 1.0) {
 
 // 8. Candelabra
 const flames = [];
+const floorLights = []; // shared by the candelabra and the Andalusian lanterns, so toggling never changes the light count
 {
   const p = defPart('candles', 'Candelabra', 'Four iron stands with flickering candlelight.', new THREE.Vector3(0, -0.3, 0));
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
@@ -941,7 +1020,295 @@ const flames = [];
     }
     addPiece(p, g);
     const l = new THREE.PointLight(0xff9a3c, 10, 9, 2); l.position.set(sx * 2.0, Math.max(...tops) + 0.1, sz * 2.85); scene.add(l);
-    p.lights.push({ light: l, k: 10, seed: rng() * 100 });
+    floorLights.push(l);
+    p.lights.push({ light: l, k: 10, seed: rng() * 100, pos: l.position.clone() });
+  }
+}
+
+// ===========================================================================
+// Andalusian profile. Each part is a printable add-on at the case's real
+// scale: flat backs, overhangs of 45° or less, tiles that fit a 256 mm bed,
+// and mounting that uses what the NX260 already has (thumbscrews, fan
+// screws, steel panels for magnets, the roof edge).
+// ===========================================================================
+function clipSeg(a, b, r) { // Liang–Barsky against [xmin, ymin, xmax, ymax]
+  let t0 = 0, t1 = 1; const dx = b[0] - a[0], dy = b[1] - a[1];
+  const p = [-dx, dx, -dy, dy], q = [a[0] - r[0], r[2] - a[0], a[1] - r[1], r[3] - a[1]];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return null; continue; }
+    const t = q[i] / p[i];
+    if (p[i] < 0) { if (t > t1) return null; if (t > t0) t0 = t; } else { if (t < t0) return null; if (t < t1) t1 = t; }
+  }
+  return t1 - t0 < 1e-4 ? null : [[a[0] + t0 * dx, a[1] + t0 * dy], [a[0] + t1 * dx, a[1] + t1 * dy]];
+}
+// Lattice straps: one instanced box per 2D segment, lying in the local XY plane
+function straps(segs, width, depth, mat) {
+  const inst = new THREE.InstancedMesh(Box(1, width, depth), mat, segs.length), d = new THREE.Object3D();
+  segs.forEach(([a, b], i) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    d.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 0);
+    d.rotation.set(0, 0, Math.atan2(dy, dx)); d.scale.set(Math.hypot(dx, dy) + width * 0.9, 1, 1);
+    d.updateMatrix(); inst.setMatrixAt(i, d.matrix);
+  });
+  inst.castShadow = inst.receiveShadow = true;
+  return inst;
+}
+// Outline of an 8-point star (two overlapped squares): tips at ro, notches at ro·cos45°/cos22.5°
+function starSegs(cx, cy, ro) {
+  const ri = ro * 0.7654, pts = [];
+  for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, r = k % 2 ? ri : ro; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+  return pts.map((p, k) => [p, pts[(k + 1) % 16]]);
+}
+// Polylobed (cusped) arch: n lobes across the half circle, cusps pointing inward
+class LobedArch extends THREE.Curve {
+  constructor(R, depth, n) { super(); this.R = R; this.d = depth; this.n = n; }
+  getPoint(t, target = new THREE.Vector3()) {
+    const th = Math.PI * (1 - t), r = this.R - this.d * (1 - Math.abs(Math.sin(this.n * th)));
+    return target.set(Math.cos(th) * r, Math.sin(th) * r, 0);
+  }
+}
+const AND = { profile: 'andalusi' };
+
+// 1. Horseshoe arch & alfiz (Córdoba): the opening is sized so all three 120 mm fans stay uncovered
+{
+  const p = defPart('alfiz', 'Horseshoe arch & alfiz', 'Córdoba-style arch with alternating red and cream voussoirs, framed by a rectangular alfiz and marble colonnettes.', new THREE.Vector3(0, 0, 1.2), {
+    ...AND, print: '227 × 448 mm frame, 5 mm plate · 19 voussoirs in two colours · opening clears all 3 fans · prints as 3 pinned segments',
+    view: [[0.7, CY + 0.3, 7.6], [0, CY, D / 2]],
+  });
+  const R = 0.72, al = Math.asin(0.3), yc = 3.5, j = R * Math.cos(al), yImp = yc - R * Math.sin(al), X = W / 2 + 0.06;
+  const z0 = D / 2 + 0.075, zf = z0 + 0.05;
+  const s = new THREE.Shape();
+  s.moveTo(-X, 0); s.lineTo(-X, H); s.lineTo(X, H); s.lineTo(X, 0); s.lineTo(j, 0); s.lineTo(j, yImp);
+  s.absarc(0, yc, R, -al, Math.PI + al, false);
+  s.lineTo(-j, 0); s.closePath();
+  addPiece(p, mk(new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: false, curveSegments: 48 }), A.stucco, 0, FOOT, z0));
+
+  const ring = new THREE.Group(); ring.position.set(0, FOOT + yc, zf);
+  const N = 19, R2 = R + 0.17, span = Math.PI + 2 * al;
+  for (let k = 0; k < N; k++) {
+    const b0 = -al + span * k / N + 0.006, b1 = -al + span * (k + 1) / N - 0.006;
+    const vs = new THREE.Shape();
+    vs.moveTo(Math.cos(b0) * R, Math.sin(b0) * R); vs.lineTo(Math.cos(b0) * R2, Math.sin(b0) * R2);
+    vs.absarc(0, 0, R2, b0, b1, false);
+    vs.lineTo(Math.cos(b1) * R, Math.sin(b1) * R); vs.absarc(0, 0, R, b1, b0, true);
+    mk(new THREE.ExtrudeGeometry(vs, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.005, bevelSegments: 1, curveSegments: 6 }), k % 2 ? A.cream : A.red, 0, 0, 0, ring);
+  }
+  addPiece(p, ring);
+
+  const alfiz = new THREE.Group(); alfiz.position.set(0, FOOT, zf);
+  const ax = 0.97, top = H - 0.06;
+  mk(Box(2 * ax + 0.035, 0.035, 0.025), A.plaster, 0, top, 0.0125, alfiz);
+  for (const sx of [-1, 1]) mk(Box(0.035, top - yImp, 0.025), A.plaster, sx * ax, (top + yImp) / 2, 0.0125, alfiz);
+  addPiece(p, alfiz);
+
+  for (const sx of [-1, 1]) {
+    const col = new THREE.Group(); col.position.set(sx * (j + 0.05), FOOT, zf + 0.03);
+    const shaftH = yImp - 0.34;
+    mk(Box(0.11, 0.08, 0.08), A.marble, 0, 0.04, 0, col);
+    const torus = mk(new THREE.TorusGeometry(0.045, 0.012, 6, 16), A.marble, 0, 0.09, 0, col); torus.rotation.x = Math.PI / 2;
+    mk(new THREE.CylinderGeometry(0.04, 0.04, shaftH, 12), A.marble, 0, 0.08 + shaftH / 2, 0, col);
+    // Nasrid capital: cylindrical drum under a carved cubic block, then the impost
+    mk(new THREE.CylinderGeometry(0.05, 0.042, 0.09, 12), A.marble, 0, yImp - 0.21, 0, col);
+    mk(Box(0.12, 0.1, 0.1), A.stucco, 0, yImp - 0.115, 0, col);
+    mk(Box(0.15, 0.03, 0.12), A.marble, 0, yImp - 0.05, 0, col);
+    addPiece(p, col);
+  }
+}
+
+// 2. Star rosette fan grilles: {8/3} star, inner {8/2} star, radial ties, all one connected print
+function rosette(rear) {
+  const g = new THREE.Group(), segs = [];
+  const poly = (r, step, off) => {
+    const v = []; for (let k = 0; k < 8; k++) v.push([Math.cos(off + k * Math.PI / 4) * r, Math.sin(off + k * Math.PI / 4) * r]);
+    for (let k = 0; k < 8; k++) segs.push([v[k], v[(k + step) % 8]]);
+  };
+  poly(0.55, 3, Math.PI / 8); poly(0.27, 2, 0);
+  for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; segs.push([[Math.cos(a) * 0.27, Math.sin(a) * 0.27], [Math.cos(a) * 0.56, Math.sin(a) * 0.56]]); }
+  if (rear) for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) segs.push([[sx * 0.4, sy * 0.4], [sx * 0.525, sy * 0.525]]);
+  g.add(straps(segs, 0.022, 0.03, A.brass));
+  mk(new THREE.TorusGeometry(0.562, 0.018, 8, 72), A.brass, 0, 0, 0, g);
+  const hub = mk(new THREE.CylinderGeometry(0.06, 0.06, 0.035, 16), A.brass, 0, 0, 0, g); hub.rotation.x = Math.PI / 2;
+  if (rear) for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { // bosses on the fan's 105 mm screw pattern
+    const b = mk(new THREE.CylinderGeometry(0.055, 0.055, 0.035, 16), A.brass, sx * 0.525, sy * 0.525, 0, g); b.rotation.x = Math.PI / 2;
+    const sc = mk(new THREE.CylinderGeometry(0.028, 0.028, 0.012, 12), M.steelDark, sx * 0.525, sy * 0.525, 0.022, g); sc.rotation.x = Math.PI / 2;
+  }
+  return g;
+}
+{
+  const p = defPart('rosettes', 'Star rosette grilles', '8-point star fan grilles over each ARGB fan and the rear exhaust.', new THREE.Vector3(0, 0, 0.8), {
+    ...AND, print: '116 mm Ø × 3 mm · rear one screws on through the fan’s 105 mm holes · front ones sit on the mesh with 6 mm magnets',
+    view: [[1.5, FOOT + 2.9, 5.0], [0, FOOT + 2.3, D / 2]],
+  });
+  FRONT_FANS_Y.forEach(y => { const r = rosette(false); r.position.set(0, y, D / 2 + 0.085); addPiece(p, r); });
+  const rr = rosette(true); rr.position.set(REAR_FAN.x, REAR_FAN.y, -D / 2 - 0.022); rr.rotation.y = Math.PI;
+  addPiece(p, rr, new THREE.Vector3(0, 0, -0.8));
+}
+
+// 3. Muqarnas cornice: a crown on the roof edge, three tiers of cells corbelling out 6 mm each
+const CORNICE_H = 0.255;
+let muqPart, merlonPart;
+{
+  const p = muqPart = defPart('muqarnas', 'Muqarnas cornice', 'Three corbelled tiers of honeycomb cells crowning the roof edge, with gilded pendants.', new THREE.Vector3(0, 0.6, 0), {
+    ...AND, print: '26 mm tall, 6 mm step per tier · print upside down, no supports · 4 mitred runs on the roof edge',
+    view: [[2.6, TOP - 0.6, 3.4], [W / 2, TOP + 0.1, D / 2]],
+  });
+  const cellGeo = new THREE.SphereGeometry(1, 10, 5, Math.PI, Math.PI, 0, Math.PI / 2); cellGeo.scale(0.075, 0.075, 0.06);
+  const pend = new THREE.ConeGeometry(0.016, 0.045, 6); pend.rotateX(Math.PI);
+  const tierMat = [A.plasterDS, A.blueDS, A.plasterDS], d = new THREE.Object3D();
+  const run = (L, x, z, ry) => {
+    const g = new THREE.Group(); g.position.set(x, TOP, z); g.rotation.y = ry;
+    mk(Box(L, CORNICE_H, 0.09), A.plaster, 0, CORNICE_H / 2, -0.035, g);
+    for (let t = 0; t < 3; t++) {
+      const pt = 0.07 + t * 0.06, y = t * 0.075, off = (t % 2) * 0.075, n = Math.floor((L - off) / 0.15);
+      const inst = new THREE.InstancedMesh(cellGeo, tierMat[t], n);
+      for (let i = 0; i < n; i++) { d.position.set(-L / 2 + off + (i + 0.5) * 0.15, y, pt); d.updateMatrix(); inst.setMatrixAt(i, d.matrix); }
+      inst.castShadow = inst.receiveShadow = true; g.add(inst);
+      mk(Box(L, 0.012, pt), A.plaster, 0, y + 0.069, pt / 2, g);
+    }
+    mk(Box(L, 0.03, 0.30), A.plaster, 0, CORNICE_H - 0.015, 0.07, g);
+    const n = Math.floor(L / 0.15) + 1, pi = new THREE.InstancedMesh(pend, A.gold, n);
+    for (let i = 0; i < n; i++) { d.position.set(-L / 2 + i * 0.15, 0.0, 0.055); d.updateMatrix(); pi.setMatrixAt(i, d.matrix); }
+    g.add(pi);
+    addPiece(p, g);
+  };
+  run(W + 0.44, 0, D / 2, 0); run(W + 0.44, 0, -D / 2, Math.PI);
+  run(D, W / 2, 0, Math.PI / 2); run(D, -W / 2, 0, -Math.PI / 2);
+}
+
+// 4. Stepped merlons: sit on the roof edge, or on the cornice when it is fitted
+{
+  const p = merlonPart = defPart('merlons', 'Stepped merlons', 'Alhambra-red stepped battlements around the roof line.', new THREE.Vector3(0, 0.7, 0), {
+    ...AND, print: '38 merlons, 20 × 28 × 5 mm · flat profile, prints face-down · slot into an 8 mm rail that clips over the roof edge',
+    view: [[3.6, TOP + 2.6, 4.4], [0, TOP + 0.3, 0]],
+  });
+  const ms = new THREE.Shape();
+  [[-0.1, 0], [0.1, 0], [0.1, 0.14], [0.065, 0.14], [0.065, 0.21], [0.03, 0.21], [0.03, 0.28], [-0.03, 0.28], [-0.03, 0.21], [-0.065, 0.21], [-0.065, 0.14], [-0.1, 0.14]]
+    .forEach(([x, y], i) => i ? ms.lineTo(x, y) : ms.moveTo(x, y));
+  ms.closePath();
+  const mGeo = new THREE.ExtrudeGeometry(ms, { depth: 0.05, bevelEnabled: false }); mGeo.translate(0, 0, -0.025);
+  const d = new THREE.Object3D();
+  const run = (L, x, z, ry) => {
+    const g = new THREE.Group(); g.position.set(x, TOP, z); g.rotation.y = ry;
+    mk(Box(L, 0.03, 0.08), A.tapial, 0, 0.015, -0.03, g);
+    const n = Math.round(L / 0.3), inst = new THREE.InstancedMesh(mGeo, A.tapial, n);
+    for (let i = 0; i < n; i++) { d.position.set(-L / 2 + (i + 0.5) * L / n, 0.03, -0.03); d.updateMatrix(); inst.setMatrixAt(i, d.matrix); }
+    inst.castShadow = inst.receiveShadow = true; g.add(inst);
+    addPiece(p, g);
+  };
+  run(W - 0.1, 0, D / 2, 0); run(W - 0.1, 0, -D / 2, Math.PI);
+  run(D - 0.1, W / 2, 0, Math.PI / 2); run(D - 0.1, -W / 2, 0, -Math.PI / 2);
+}
+
+// 5. Celosía: star-and-cross cedar lattice hung on the glass panel's own thumbscrews
+{
+  const p = defPart('celosia', 'Celosía lattice', 'Star-and-cross cedar lattice over the glass, so the build still shows through.', new THREE.Vector3(-0.9, 0, 0), {
+    ...AND, print: '377 × 446 mm, 3.5 mm straps on a 45 mm star grid · 4 tiles · hangs on the glass panel’s 4 thumbscrews',
+    view: [[-7.6, CY + 0.6, 2.2], [-W / 2, CY, 0]],
+  });
+  const g = new THREE.Group(); g.position.set(-W / 2 - 0.06, CY, 0); g.rotation.y = -Math.PI / 2;
+  const hu = (D - 0.02) / 2, hv = (H - 0.02) / 2, bw = 0.1, a = 0.45;
+  const rect = [-hu + bw * 0.7, -hv + bw * 0.7, hu - bw * 0.7, hv - bw * 0.7], segs = [];
+  for (let i = -5; i <= 5; i++) for (let k = -6; k <= 6; k++) for (const [s0, s1] of starSegs(i * a, k * a, a / 2)) { const c = clipSeg(s0, s1, rect); if (c) segs.push(c); }
+  g.add(straps(segs, 0.035, 0.035, A.cedar));
+  mk(Box(2 * hu, bw, 0.045), A.cedar, 0, hv - bw / 2, 0, g);
+  mk(Box(2 * hu, bw, 0.045), A.cedar, 0, -hv + bw / 2, 0, g);
+  for (const su of [-1, 1]) mk(Box(bw, 2 * hv - 2 * bw, 0.045), A.cedar, su * (hu - bw / 2), 0, 0, g);
+  for (const su of [-1, 1]) for (const sv of [-1, 1]) {
+    const u = su * (D / 2 - 0.06), v = sv * (H / 2 - 0.06);
+    const so = mk(new THREE.CylinderGeometry(0.03, 0.03, 0.032, 12), A.brass, u, v, -0.038, g); so.rotation.x = Math.PI / 2;
+    const cap = mk(new THREE.CylinderGeometry(0.04, 0.04, 0.015, 16), A.brass, u, v, 0.03, g); cap.rotation.x = Math.PI / 2;
+  }
+  addPiece(p, g);
+}
+
+// 6. Sebka relief (Almohad, as on the Giralda): diamond net springing from a pentalobed arcade
+{
+  const p = defPart('sebka', 'Sebka relief', 'Almohad diamond net rising from a pentalobed arcade, covering the solid side panel.', new THREE.Vector3(0.9, 0, 0), {
+    ...AND, print: '360 × 432 mm, 4 mm straps on a 1.2 mm backing · 4 tiles · 10 × 2 mm magnets on the steel side panel',
+    view: [[8.2, CY + 0.6, -2.4], [W / 2, CY, 0]],
+  });
+  const g = new THREE.Group(); g.position.set(W / 2 + 0.002, 0, 0); g.rotation.y = Math.PI / 2;
+  const hu = 1.8, v0 = FOOT + 0.08, v1 = TOP - 0.08, bw = 0.06, zs = 0.032;
+  mk(Box(2 * hu, v1 - v0, 0.012), A.plaster, 0, (v0 + v1) / 2, 0.006, g);
+  mk(Box(2 * hu, bw, 0.04), A.brick, 0, v1 - bw / 2, zs, g);
+  mk(Box(2 * hu, bw, 0.04), A.brick, 0, v0 + bw / 2, zs, g);
+  for (const su of [-1, 1]) mk(Box(bw, v1 - v0, 0.04), A.brick, su * (hu - bw / 2), (v0 + v1) / 2, zs, g);
+  const R = 0.42, ys = v0 + bw + 0.8, archGeo = new THREE.TubeGeometry(new LobedArch(R, 0.07, 5), 90, 0.022, 6, false);
+  for (let k = 0; k < 4; k++) mk(archGeo, A.brick, -1.35 + k * 0.9, ys, zs, g);
+  const colH = ys - v0 - bw - 0.05;
+  for (let k = 1; k < 4; k++) {
+    const u = -1.8 + k * 0.9;
+    mk(new THREE.CylinderGeometry(0.03, 0.03, colH, 10), A.marble, u, v0 + bw + colH / 2, zs, g);
+    mk(Box(0.1, 0.05, 0.06), A.marble, u, ys - 0.025, zs, g);
+  }
+  const yb = ys + R, region = [-hu + bw * 0.6, yb, hu - bw * 0.6, v1 - bw * 0.6], segs = [];
+  for (let k = -12; k <= 20; k++) for (const sg of [-1, 1]) {
+    const u = -1.8 + k * 0.45, c = clipSeg([u, yb], [u + sg * 4.5, yb + 7], region);
+    if (c) segs.push(c);
+  }
+  const net = straps(segs, 0.03, 0.04, A.brick); net.position.z = zs; g.add(net);
+  const knots = [];
+  for (let i = -16; i <= 16; i++) for (let m = 1; m <= 12; m++) {
+    if ((i + m) % 2) continue;
+    const u = i * 0.225, y = yb + m * 0.35;
+    if (Math.abs(u) < hu - bw && y < v1 - bw) knots.push([u, y]);
+  }
+  const knotGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.05, 12); knotGeo.rotateX(Math.PI / 2);
+  const ki = new THREE.InstancedMesh(knotGeo, A.brick, knots.length), d = new THREE.Object3D();
+  knots.forEach(([u, y], i) => { d.position.set(u, y, zs + 0.005); d.updateMatrix(); ki.setMatrixAt(i, d.matrix); });
+  ki.castShadow = true; g.add(ki);
+  addPiece(p, g);
+}
+
+// 7. Zellige plinth: a tray frame the case stands inside
+{
+  const p = defPart('zellige', 'Zellige plinth', 'Tiled base frame with 8-point star zellige and green-glazed corner pavilions.', new THREE.Vector3(0, -0.45, 0), {
+    ...AND, print: '311 × 475 mm outside, 34 mm tall, 30 mm clear of the case · 8 runs + 4 corners · zellige as colour-change layers',
+    view: [[3.0, 1.5, 4.6], [0.6, 0.2, D / 2 + 0.3]],
+  });
+  const ix = W / 2 + 0.3, iz = D / 2 + 0.3, t = 0.18, h = 0.3;
+  const zMat = len => new THREE.MeshStandardMaterial({ map: withRepeat(zelligeTex, len / 0.3, 1), roughness: 0.25, metalness: 0.05 });
+  const wall = (len, along, x, z) => {
+    const g = new THREE.Group(); g.position.set(x, 0, z);
+    mk(along === 'x' ? Box(len, h, t) : Box(t, h, len), zMat(len), 0, h / 2, 0, g);
+    mk(along === 'x' ? Box(len + 0.03, 0.035, t + 0.04) : Box(t + 0.04, 0.035, len + 0.03), A.glazeGreen, 0, h + 0.0175, 0, g);
+    addPiece(p, g);
+  };
+  wall(2 * ix + t, 'x', 0, iz + t / 2); wall(2 * ix + t, 'x', 0, -iz - t / 2);
+  wall(2 * iz, 'z', ix + t / 2, 0); wall(2 * iz, 'z', -ix - t / 2, 0);
+  const cMat = zMat(0.34);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const c = new THREE.Group(); c.position.set(sx * (ix + t / 2), 0, sz * (iz + t / 2));
+    mk(Box(0.34, 0.44, 0.34), cMat, 0, 0.22, 0, c);
+    const roof = mk(new THREE.ConeGeometry(0.26, 0.22, 4), A.glazeGreen, 0, 0.55, 0, c); roof.rotation.y = Math.PI / 4;
+    mk(new THREE.SphereGeometry(0.035, 10, 8), A.brass, 0, 0.68, 0, c);
+    addPiece(p, c);
+  }
+}
+
+// 8. Brass lanterns: pierced octagonal shells around an LED tea light, reusing the floor lights
+{
+  const p = defPart('lanterns', 'Brass lanterns', 'Pierced star lanterns that throw warm light across the floor.', new THREE.Vector3(0, -0.3, 0), {
+    ...AND, print: '130 mm tall, 44 mm across · 8 flat pierced panels + dome around a 38 mm LED tea light',
+    view: [[3.8, 1.5, 4.9], [2.0, 0.6, 2.85]],
+  });
+  let i = 0;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const g = new THREE.Group(); g.position.set(sx * 2.0, 0, sz * 2.85);
+    mk(new THREE.CylinderGeometry(0.15, 0.19, 0.1, 8), A.brass, 0, 0.05, 0, g);
+    mk(new THREE.CylinderGeometry(0.07, 0.1, 0.08, 8), A.brass, 0, 0.14, 0, g);
+    mk(new THREE.CylinderGeometry(0.22, 0.2, 0.03, 8), A.brass, 0, 0.195, 0, g);
+    mk(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 8, 1, true), A.pierced, 0, 0.51, 0, g);
+    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; mk(Box(0.022, 0.6, 0.022), A.brass, Math.sin(a) * 0.2, 0.51, Math.cos(a) * 0.2, g); }
+    const core = mk(new THREE.CylinderGeometry(0.1, 0.1, 0.42, 8), A.lampGlow, 0, 0.5, 0, g); core.castShadow = false;
+    mk(new THREE.CylinderGeometry(0.24, 0.21, 0.04, 8), A.brass, 0, 0.83, 0, g);
+    const dome = mk(new THREE.SphereGeometry(0.21, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), A.brass, 0, 0.85, 0, g); dome.scale.y = 1.1;
+    [[1.1, 0.035], [1.16, 0.026], [1.21, 0.018]].forEach(([y, r]) => mk(new THREE.SphereGeometry(r, 12, 8), A.brass, 0, y, 0, g));
+    mk(new THREE.ConeGeometry(0.008, 0.08, 6), A.brass, 0, 1.27, 0, g);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffa850, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.7 }));
+    glow.position.set(0, 0.52, 0); glow.scale.set(1.1, 1.1, 1); g.add(glow);
+    addPiece(p, g);
+    p.lights.push({ light: floorLights[i++], k: 6, seed: rng() * 100, pos: new THREE.Vector3(sx * 2.0, 0.55, sz * 2.85) });
   }
 }
 
@@ -1021,7 +1388,7 @@ const isTouch = matchMedia('(pointer: coarse)').matches;
 function setMode(m) {
   if (m === mode) return;
   const prev = mode; mode = m;
-  document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+  document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
   hintEl.textContent = HINTS[m];
   padEl.hidden = !(m === 'roam' && isTouch);
   controls.enabled = m === 'orbit';
@@ -1086,9 +1453,10 @@ addEventListener('keydown', e => {
     roam.keys.add(e.code); e.preventDefault(); return;
   }
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') roam.keys.add('Shift');
-  if (e.code === 'KeyG') { const anyOn = gothic().some(p => p.on); gothic().forEach(p => setPart(p, !anyOn)); toast(anyOn ? 'Stripped to the stock NX260' : 'All gothic parts restored'); }
+  if (e.code === 'KeyG') { const anyOn = active().some(p => p.on); active().forEach(p => setPart(p, !anyOn)); toast(anyOn ? 'Stripped to the stock NX260' : 'All parts restored'); }
+  if (e.code === 'KeyP') { setProfile(profile === 'gothic' ? 'andalusi' : 'gothic'); toast(`Style · ${profile === 'gothic' ? 'Gothic' : 'Andalusian'}`); }
   const n = parseInt(e.key, 10);
-  if (n >= 1 && n <= 8) { const p = gothic()[n - 1]; if (p) { setPart(p, !p.on); toast(`${p.name} ${p.on ? 'added' : 'removed'}`); } }
+  if (n >= 1 && n <= 8) { const p = active()[n - 1]; if (p) { setPart(p, !p.on); toast(`${p.name} ${p.on ? 'added' : 'removed'}`); } }
 });
 addEventListener('keyup', e => { roam.keys.delete(e.code); if (e.key === 'Shift') roam.keys.delete('Shift'); });
 addEventListener('blur', () => roam.keys.clear());
@@ -1135,17 +1503,60 @@ function updateCamera(dt, t) {
 // ---------------------------------------------------------------------------
 // UI wiring
 // ---------------------------------------------------------------------------
-const gothic = () => PARTS.filter(p => p.id !== 'glass');
+// Camera framings for the gothic parts (the Andalusian ones carry theirs in defPart)
+const GOTHIC_VIEWS = {
+  spires: [[4.5, 7.8, 5.2], [0, TOP + 0.6, 0]], crown: [[3.2, 6.6, 4.2], [0, TOP, 0]],
+  gargoyles: [[2.8, 5.4, 3.6], [W / 2, TOP - 0.3, D / 2]], tracery: [[0.8, CY + 0.4, 7.4], [0, CY, D / 2]],
+  stained: [[-6.8, CY + 0.6, 1.0], [-W / 2, CY, 0]], buttresses: [[7.2, 3.6, 3.2], [W / 2 + 1, 2.4, 0]],
+  plinth: [[3.6, 1.8, 5.2], [0, 0.3, 1]], candles: [[4.6, 2.2, 5.6], [2.0, 1.4, 2.85]],
+};
+PARTS.forEach(p => { if (GOTHIC_VIEWS[p.id]) p.view = GOTHIC_VIEWS[p.id]; });
+// Andalusian parts start hidden; their switches default to on for the first visit
+PARTS.filter(p => p.profile === 'andalusi').forEach(p => setPart(p, false, true));
+
+const PROFILES = {
+  gothic: { title: 'Sanctum', heading: 'Gothic additions', bg: 0x0b0a10, floor: 0x8a8790, sky: 0x3a4060 },
+  andalusi: { title: 'Alcázar', heading: 'Andalusian additions', bg: 0x0d0c1a, floor: 0xb59a80, sky: 0x4a4070 },
+};
+let profile = 'gothic', themeK = 0;
+const active = () => PARTS.filter(p => p.profile === profile);
 const list = document.getElementById('partList');
-gothic().forEach((p, i) => {
-  const label = document.createElement('label'); label.className = 'part'; label.htmlFor = 'p-' + p.id;
-  label.innerHTML = `<input type="checkbox" id="p-${p.id}" checked><span class="sw"></span><span class="txt"><b></b><small></small></span><kbd>${i + 1}</kbd>`;
-  label.querySelector('b').textContent = p.name; label.querySelector('small').textContent = p.desc;
-  label.querySelector('input').addEventListener('change', e => setPart(p, e.target.checked));
-  list.appendChild(label);
-});
-document.getElementById('stripAll').addEventListener('click', () => { gothic().forEach(p => setPart(p, false)); toast('Stripped to the stock NX260'); });
-document.getElementById('restoreAll').addEventListener('click', () => { gothic().forEach(p => setPart(p, true)); toast('All gothic parts restored'); });
+function renderList() {
+  list.replaceChildren();
+  active().forEach((p, i) => {
+    const label = document.createElement('label'); label.className = 'part'; label.htmlFor = 'p-' + p.id;
+    label.innerHTML = `<input type="checkbox" id="p-${p.id}"><span class="sw"></span><span class="txt"><b></b><small></small></span><button class="view" type="button" title="Frame this part (key ${i + 1} toggles it)">View</button>`;
+    label.querySelector('b').textContent = p.name; label.querySelector('small').textContent = p.desc;
+    if (p.print) { const pr = document.createElement('span'); pr.className = 'print'; pr.textContent = p.print; label.querySelector('.txt').appendChild(pr); }
+    const input = label.querySelector('input'); input.checked = p.on;
+    input.addEventListener('change', e => setPart(p, e.target.checked));
+    label.querySelector('.view').addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (!p.on) setPart(p, true);
+      if (mode !== 'orbit') setMode('orbit');
+      goTo(...p.view);
+    });
+    list.appendChild(label);
+  });
+}
+function setProfile(id) {
+  if (id === profile) return;
+  const out = active(), wait = out.some(p => p.on) ? 0.5 : 0;
+  out.forEach(p => { p.want = p.on; setPart(p, false); });
+  profile = id;
+  active().forEach(p => setPart(p, p.want, false, wait));
+  const info = PROFILES[id];
+  document.getElementById('app').dataset.profile = id;
+  document.getElementById('title').textContent = info.title;
+  document.getElementById('h-gothic').textContent = info.heading;
+  document.getElementById('printNote').hidden = id !== 'andalusi';
+  document.querySelectorAll('#profileSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.profile === id)));
+  renderList();
+}
+renderList();
+document.querySelectorAll('#profileSeg button').forEach(b => b.addEventListener('click', () => setProfile(b.dataset.profile)));
+document.getElementById('stripAll').addEventListener('click', () => { active().forEach(p => setPart(p, false)); toast('Stripped to the stock NX260'); });
+document.getElementById('restoreAll').addEventListener('click', () => { active().forEach(p => setPart(p, true)); toast('All parts restored'); });
 document.getElementById('glassToggle').addEventListener('change', e => setPart(glassPart, e.target.checked));
 
 const effectEl = document.getElementById('effect'), colorEl = document.getElementById('ledColor');
@@ -1160,7 +1571,7 @@ bindRange('fanSpeed', 'fanOut', v => v === 0 ? 'stopped' : `${Math.round(v * 120
 bindRange('fog', 'fogOut', v => v.toFixed(3), v => { scene.fog.density = v; });
 bindRange('moon', 'moonOut', v => v.toFixed(2), v => { moon.intensity = v; hemi.intensity = 0.35 + v * 0.3; });
 
-document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
 document.querySelectorAll('#presets button').forEach(b => b.addEventListener('click', () => {
   if (mode !== 'orbit') setMode('orbit');
   const [p, t] = VIEWS[b.dataset.view]; goTo(p, t);
@@ -1182,6 +1593,10 @@ new ResizeObserver(resize).observe(canvas); resize();
 // ---------------------------------------------------------------------------
 // Loop
 // ---------------------------------------------------------------------------
+const partLights = [...new Set(PARTS.flatMap(p => p.lights.map(L => L.light)))];
+partLights.forEach(l => { l.userData.p = new THREE.Vector3(); });
+const themeColors = Object.fromEntries(Object.entries(PROFILES).map(([k, v]) => [k, { bg: new THREE.Color(v.bg), floor: new THREE.Color(v.floor), sky: new THREE.Color(v.sky) }]));
+
 const clock = new THREE.Clock();
 let first = true;
 renderer.setAnimationLoop(() => {
@@ -1189,10 +1604,20 @@ renderer.setAnimationLoop(() => {
   updateParts(dt);
   updateLeds(t);
   for (const f of fans) f.rotor.rotation[f.axis || 'z'] += dt * state.fanSpeed * 16;
+  // Lights can be shared between parts (candelabra / lanterns): sum intensities, blend positions by part level
+  for (const l of partLights) { const u = l.userData; u.acc = 0; u.w = 0; u.p.set(0, 0, 0); }
   for (const p of PARTS) for (const L of p.lights) {
     const flick = L.seed !== undefined ? 0.82 + 0.1 * Math.sin(t * 13 + L.seed) + 0.08 * Math.sin(t * 31 + L.seed * 2) : 1;
-    L.light.intensity = L.k * (p.level ?? 1) * flick;
+    const lv = p.level ?? 1, u = L.light.userData;
+    u.acc += L.k * lv * flick;
+    if (L.pos) { u.p.addScaledVector(L.pos, lv + 1e-4); u.w += lv + 1e-4; }
   }
+  for (const l of partLights) { const u = l.userData; l.intensity = u.acc; if (u.w) l.position.copy(u.p).multiplyScalar(1 / u.w); }
+  merlonPart.root.position.y = (muqPart.level ?? 0) * CORNICE_H;
+  themeK += ((profile === 'andalusi' ? 1 : 0) - themeK) * (1 - Math.exp(-dt * 2.5));
+  scene.background.lerpColors(themeColors.gothic.bg, themeColors.andalusi.bg, themeK); scene.fog.color.copy(scene.background);
+  floor.material.color.lerpColors(themeColors.gothic.floor, themeColors.andalusi.floor, themeK);
+  hemi.color.lerpColors(themeColors.gothic.sky, themeColors.andalusi.sky, themeK);
   for (const f of flames) { const s = 1 + 0.12 * Math.sin(t * 17 + f.seed) + 0.06 * Math.sin(t * 41 + f.seed); f.fl.scale.set(0.8, 1.8 * s, 0.8); f.glow.material.opacity = 0.65 + 0.2 * s - 0.2; }
   if (dustCount) {
     for (let i = 0; i < dustCount; i++) {
