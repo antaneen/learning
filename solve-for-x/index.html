@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Solve for x</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=DM+Mono:wght@400;500&family=STIX+Two+Text:ital,wght@0,500;1,500&display=swap">
+<style>
+/* Layout: full-bleed low-poly classroom under a domed city; caption box and scrub bar docked bottom-centre */
+:root {
+  --bg: #121822;
+  --panel: rgba(13, 19, 29, 0.8);
+  --ink: #e8eef3;
+  --muted: #93a1b3;
+  --holo: #7fd8e8;
+  --coral: #ff8f80;
+  --gold: #ffd27a;
+  --line: rgba(127, 216, 232, 0.25);
+  --f-ui: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", system-ui, sans-serif;
+  --f-mono: "DM Mono", ui-monospace, Menlo, monospace;
+  --f-math: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+  color-scheme: dark;
+}
+html { height: 100%; box-sizing: border-box; background: var(--bg); }
+*, *::before, *::after { box-sizing: inherit; }
+body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--f-ui); }
+#app { position: relative; height: 100%; overflow: hidden; }
+#stage { display: block; width: 100%; height: 100%; }
+
+.title { position: absolute; top: 14px; left: max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
+.title span { font: 500 11px/1 var(--f-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--holo); }
+.title h1 { margin: 0; font: 700 26px/1.1 var(--f-ui); }
+.title h1 i { font: italic 500 30px/1 var(--f-math); color: var(--gold); }
+
+.dock {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px;
+  width: min(720px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 10px;
+}
+.caption {
+  min-height: 74px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 16px 12px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  display: flex; flex-direction: column; gap: 3px; transition: opacity 0.25s;
+}
+.caption.quiet { opacity: 0; }
+.who { font: 500 11px/1 var(--f-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--holo); }
+#line { font: 500 19px/1.45 var(--f-ui); text-wrap: pretty; }
+#line .m { font: italic 500 21px/1 var(--f-math); color: var(--gold); }
+#line span { opacity: 0; }
+#line span.on { opacity: 1; }
+
+.controls { display: grid; grid-template-columns: auto auto 1fr auto; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.ctl { width: 36px; height: 36px; display: grid; place-items: center; background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.ctl:hover { border-color: var(--holo); color: var(--holo); }
+.ctl:focus-visible, #scrub:focus-visible { outline: 2px solid var(--holo); outline-offset: 2px; }
+.ctl svg { width: 16px; height: 16px; fill: currentColor; }
+.track { position: relative; min-width: 0; height: 36px; display: flex; align-items: center; }
+#scrub { width: 100%; margin: 0; accent-color: var(--holo); position: relative; z-index: 1; background: transparent; }
+.ticks { position: absolute; inset: 0; pointer-events: none; }
+.tick { position: absolute; top: 2px; transform: translateX(-50%); font: 400 10px/1 var(--f-mono); color: var(--muted); white-space: nowrap; }
+.tick::after { content: ""; position: absolute; left: 50%; top: 13px; width: 1px; height: 6px; background: var(--muted); }
+#time { font: 400 12px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 84px; text-align: right; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+#loading { position: absolute; inset: 0; display: grid; place-items: center; background: var(--bg); color: var(--holo); font: 500 16px var(--f-mono); transition: opacity 0.5s; }
+#loading.done { opacity: 0; pointer-events: none; }
+
+@media (max-width: 560px) {
+  #line { font-size: 16px; } #line .m { font-size: 18px; }
+  .tick { display: none; }
+  #time { min-width: 0; }
+  .title h1 { font-size: 21px; }
+}
+</style>
+
+<div id="app">
+  <canvas id="stage" aria-label="Animated lesson: Mira solves 2x + 3 = 11 on a holographic board"></canvas>
+  <div class="title"><span>Algebra with Mira</span><h1>Solve for <i>x</i></h1></div>
+  <div class="dock">
+    <div class="caption quiet" id="caption"><span class="who">Mira</span><div id="line"></div></div>
+    <div class="controls">
+      <button class="ctl" id="play" type="button" aria-label="Pause"><svg viewBox="0 0 16 16" id="playIcon"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button>
+      <button class="ctl" id="restart" type="button" aria-label="Restart"><svg viewBox="0 0 16 16"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7l1.6.6A3.8 3.8 0 1 0 8 4.2V6L4.8 3.4 8 .8z"/></svg></button>
+      <div class="track"><div class="ticks" id="ticks"></div><input type="range" id="scrub" min="0" max="36" step="0.01" value="0" aria-label="Lesson position"></div>
+      <span id="time">0:00 / 0:36</span>
+    </div>
+  </div>
+  <div class="sr" aria-live="polite" id="live"></div>
+  <div id="loading">Booting the classroom…</div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DUR = 36;
+const clamp01 = v => Math.min(1, Math.max(0, v));
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const bump = (d, len) => d < 0 || d > len ? 0 : Math.sin(Math.PI * d / len);
+const rng = (() => { let s = 7; return () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();
+
+// ---------------------------------------------------------------------------
+// Script: everything below is a pure function of the lesson time t
+// ---------------------------------------------------------------------------
+const CAPTIONS = [
+  [0.3, 3.3, "Hi, I'm Mira! Let's solve one equation together."],
+  [3.5, 8.1, 'Here it is: 2*x* + 3 = 11. Our goal is to get *x* alone.'],
+  [8.3, 13.9, 'First, subtract 3 from both sides. What you do to one side, you do to the other.'],
+  [14.0, 18.6, 'The 3s cancel out, which leaves 2*x* = 8.'],
+  [18.8, 24.6, '*x* is multiplied by 2, so divide both sides by 2.'],
+  [24.8, 29.6, 'And there it is: *x* = 4!'],
+  [29.8, 36, "Let's check: 2 × 4 + 3 = 11. It works. Nice job!"],
+];
+const CHAPTERS = [[0, 'Hello'], [8.3, '− 3'], [14, '2x = 8'], [18.8, '÷ 2'], [24.8, 'x = 4'], [29.8, 'Check']];
+
+const C = { ink: '#e8f6fa', coral: '#ff8f80', gold: '#ffd27a', green: '#8fe3a8' };
+// Board lines: tokens [text, italic?, colour]; the token marked eq lines up on one column
+const LINES = [
+  { at: 3.8, dur: 1.4, y: 160, size: 62, toks: [['2'], ['x', 1], [' + 3'], [' = ', 0, null, 1], ['11']] },
+  { at: 9.0, dur: 1.8, y: 255, size: 62, toks: [['2'], ['x', 1], [' + 3'], [' − 3', 0, C.coral], [' = ', 0, null, 1], ['11'], [' − 3', 0, C.coral]] },
+  { at: 14.4, dur: 1.0, y: 350, size: 62, toks: [['2'], ['x', 1], [' = ', 0, null, 1], ['8']] },
+  { at: 19.4, dur: 1.6, y: 445, size: 62, toks: [['2'], ['x', 1], [' ÷ 2', 0, C.coral], [' = ', 0, null, 1], ['8'], [' ÷ 2', 0, C.coral]] },
+  { at: 25.0, dur: 0.8, y: 555, size: 84, color: C.gold, toks: [['x', 1], [' = ', 0, null, 1], ['4']] },
+  { at: 30.6, dur: 1.6, y: 665, size: 46, color: C.green, toks: [['2(4) + 3'], [' = ', 0, null, 1], ['11']] },
+];
+// Strike-throughs: [line, token indices, start time]
+const STRIKES = [[1, [2, 3], 14.0], [3, [0, 2], 24.3]];
+
+const POSES = {
+  idle:    { bY: 0, bX: 0, bZ: 0, hX: 0, hY: 0, hZ: 0.04, rZ: -0.12, rX: 0, rE: -0.15, rEz: 0, lZ: 0.12, lX: 0, lE: -0.15, lEz: 0, wave: 0 },
+  wave:    { bY: -0.05, bX: 0, bZ: -0.04, hX: 0, hY: 0.05, hZ: 0.14, rZ: -2.45, rX: -0.25, rE: -0.35, rEz: 0, lZ: 0.15, lX: -0.1, lE: -0.4, lEz: 0, wave: 1 },
+  point:   { bY: -0.38, bX: 0, bZ: 0, hX: 0.02, hY: -0.45, hZ: 0.06, rZ: -1.32, rX: -0.5, rE: -0.12, rEz: 0, lZ: 0.18, lX: -0.35, lE: -1.25, lEz: 0, wave: 0 },
+  present: { bY: -0.16, bX: 0.02, bZ: 0, hX: 0, hY: -0.12, hZ: 0.1, rZ: -0.5, rX: -0.6, rE: -0.95, rEz: 0, lZ: 0.5, lX: -0.6, lE: -0.95, lEz: 0, wave: 0 },
+  cheer:   { bY: 0, bX: -0.04, bZ: 0.05, hX: -0.14, hY: 0, hZ: -0.12, rZ: -2.75, rX: -0.1, rE: -0.3, rEz: 0, lZ: 0.55, lX: -0.55, lE: -1.7, lEz: 0, wave: 0 },
+  bow:     { bY: 0, bX: 0.42, bZ: 0, hX: 0.28, hY: 0, hZ: 0, rZ: 0.18, rX: -0.4, rE: -0.45, rEz: 0, lZ: -0.18, lX: -0.4, lE: -0.45, lEz: 0, wave: 0 },
+};
+const KEYS = [[0, 'idle'], [0.5, 'wave'], [2.9, 'wave'], [3.6, 'point'], [7.9, 'point'], [8.5, 'present'], [9.8, 'present'], [10.3, 'point'], [13.6, 'point'],
+  [14.2, 'present'], [18.4, 'present'], [19.0, 'point'], [24.2, 'point'], [24.9, 'cheer'], [28.6, 'cheer'], [29.3, 'present'], [33.2, 'present'], [33.9, 'bow'], [35.2, 'bow'], [36, 'idle']];
+const NODS = [4.1, 15.0, 25.7, 33.0];
+const CAM = [
+  [0, [0.4, 2.5, 8.4], [0, 2.1, 0]],
+  [3.6, [-0.4, 2.4, 7.6], [-0.5, 2.15, 0]],
+  [13.5, [0.1, 2.35, 7.2], [-0.45, 2.2, 0]],
+  [24.6, [-0.2, 2.35, 6.9], [-0.5, 2.2, 0]],
+  [25.6, [-1.0, 2.45, 5.4], [-1.15, 2.25, -0.2]],
+  [29.4, [-0.9, 2.4, 5.6], [-1.1, 2.2, -0.2]],
+  [30.4, [0.3, 2.4, 7.2], [-0.3, 2.15, 0]],
+  [33.4, [0.9, 2.5, 6.4], [0.8, 2.3, 0.2]],
+  [36, [1.0, 2.5, 6.2], [0.9, 2.3, 0.2]],
+];
+
+// ---------------------------------------------------------------------------
+// Renderer & scene
+// ---------------------------------------------------------------------------
+const canvas = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x2a3a4a, 14, 60);
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+
+const flat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.8, metalness: 0, ...extra });
+const basic = (color, extra = {}) => new THREE.MeshBasicMaterial({ color, ...extra });
+const OUTLINE = new THREE.MeshBasicMaterial({ color: 0x0b0d12, side: THREE.BackSide });
+function part(geo, mat, parent, x = 0, y = 0, z = 0, outline = 0.035) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true; parent.add(m);
+  if (outline) { const o = new THREE.Mesh(geo, OUTLINE); o.scale.setScalar(1 + outline); m.add(o); }
+  return m;
+}
+
+// Sky dome with a vertical gradient, low-poly city, and the city's own glass dome
+{
+  const g = new THREE.SphereGeometry(90, 16, 10);
+  const top = new THREE.Color(0x1a2a40), hor = new THREE.Color(0x6f8796), low = new THREE.Color(0x1a2029), cols = [];
+  const pos = g.attributes.position, c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const h = pos.getY(i) / 90;
+    if (h > 0) c.lerpColors(hor, top, Math.pow(h, 0.6)); else c.lerpColors(hor, low, Math.min(1, -h * 4));
+    cols.push(c.r, c.g, c.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false })));
+
+  const n = 70, box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0);
+  const city = new THREE.InstancedMesh(box, flat(0x2c3a4b), n), d = new THREE.Object3D();
+  const lit = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), basic(0xffd9a0), n * 3);
+  let li = 0;
+  for (let i = 0; i < n; i++) {
+    const x = (rng() - 0.5) * 60, z = -10 - rng() * 26, w = 1.2 + rng() * 2.6, h = 2 + rng() * rng() * 16;
+    d.position.set(x, -0.5, z); d.scale.set(w, h, w); d.rotation.set(0, 0, 0); d.updateMatrix(); city.setMatrixAt(i, d.matrix);
+    for (let k = 0; k < 3; k++) {
+      d.position.set(x + (rng() - 0.5) * w * 0.7, 0.5 + rng() * h * 0.9, z + w / 2 + 0.02); d.scale.set(0.18, 0.12, 0.02); d.updateMatrix();
+      lit.setMatrixAt(li++, d.matrix);
+    }
+  }
+  scene.add(city, lit);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(34, 22, 9, 0, Math.PI * 2, 0, Math.PI / 2), basic(0xa8d0e0, { wireframe: true, transparent: true, opacity: 0.09, fog: false }));
+  dome.position.set(0, -3, -22); scene.add(dome);
+}
+
+// Classroom: checker floor, back wall with a big mullioned window
+{
+  const fg = new THREE.PlaneGeometry(18, 12, 18, 12).toNonIndexed(); fg.rotateX(-Math.PI / 2);
+  const cols = [], a = new THREE.Color(0x2b3340), b = new THREE.Color(0x323b49);
+  for (let i = 0; i < fg.attributes.position.count; i += 6) {
+    const x = fg.attributes.position.getX(i), z = fg.attributes.position.getZ(i);
+    const c = (Math.floor(x + 9) + Math.floor(z + 6)) % 2 ? a : b;
+    for (let k = 0; k < 6; k++) cols.push(c.r, c.g, c.b);
+  }
+  fg.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  const floor = new THREE.Mesh(fg, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.7 }));
+  floor.position.z = 3; floor.receiveShadow = true; scene.add(floor);
+
+  const wall = flat(0x3a4452), z = -2.8;
+  const wb = (w, h, x, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.3), wall); m.position.set(x, y, z); m.receiveShadow = true; scene.add(m); };
+  wb(18, 0.9, 0, 0.45); wb(18, 2.4, 0, 5.8); wb(4, 3.7, -7, 2.75); wb(4, 3.7, 7, 2.75);
+  for (const x of [-2.5, 0, 2.5]) wb(0.12, 3.7, x, 2.75);
+  wb(10, 0.12, 0, 2.6);
+}
+
+// Lights
+scene.add(new THREE.HemisphereLight(0xa6bfd6, 0x1a1d24, 0.9));
+const key = new THREE.DirectionalLight(0xfff1e0, 2.2); key.position.set(3, 6, 6); key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024); Object.assign(key.shadow.camera, { left: -5, right: 5, top: 5, bottom: -2, near: 1, far: 20 });
+key.shadow.bias = -0.0008; scene.add(key);
+const rim = new THREE.DirectionalLight(0x7fd8e8, 1.4); rim.position.set(-4, 4, -3); scene.add(rim);
+
+// ---------------------------------------------------------------------------
+// Holographic board
+// ---------------------------------------------------------------------------
+const BW = 1024, BH = 720, BOARD_W = 3.0, BOARD_H = BOARD_W * BH / BW;
+const bc = document.createElement('canvas'); bc.width = BW; bc.height = BH;
+const bg = bc.getContext('2d');
+const boardTex = new THREE.CanvasTexture(bc); boardTex.colorSpace = THREE.SRGBColorSpace; boardTex.anisotropy = 8;
+const board = new THREE.Group(); board.position.set(-1.35, 2.3, -0.25); board.rotation.y = 0.2; scene.add(board);
+{
+  part(new THREE.BoxGeometry(BOARD_W + 0.12, BOARD_H + 0.12, 0.05), flat(0x1b2430), board, 0, 0, -0.03, 0.02);
+  const edge = basic(0x7fd8e8);
+  for (const [w, h, x, y] of [[BOARD_W + 0.12, 0.02, 0, (BOARD_H + 0.12) / 2], [BOARD_W + 0.12, 0.02, 0, -(BOARD_H + 0.12) / 2], [0.02, BOARD_H + 0.12, (BOARD_W + 0.12) / 2, 0], [0.02, BOARD_H + 0.12, -(BOARD_W + 0.12) / 2, 0]]) {
+    const e = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.03), edge); e.position.set(x, y, 0); board.add(e);
+  }
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(BOARD_W, BOARD_H), new THREE.MeshBasicMaterial({ map: boardTex, toneMapped: false }));
+  screen.position.z = 0.002; board.add(screen);
+  const base = part(new THREE.CylinderGeometry(0.38, 0.45, 0.1, 8), flat(0x1b2430), scene, -1.35, 0.05, -0.25, 0.03);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.02, 4, 16), edge); ring.rotation.x = Math.PI / 2; ring.position.set(-1.35, 0.105, -0.25); scene.add(ring);
+  const beamH = 2.3 - BOARD_H / 2 - 0.1;
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.34, beamH, 8, 1, true), basic(0x7fd8e8, { transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  beam.position.set(-1.35, 0.1 + beamH / 2, -0.25); scene.add(beam);
+  const glow = new THREE.PointLight(0x7fd8e8, 5, 6, 2); glow.position.set(-1.2, 2.3, 0.6); scene.add(glow);
+}
+
+// Token layout, measured once the math font is in
+let layout = [];
+const fontFor = (size, it) => `${it ? 'italic ' : ''}500 ${size}px "STIX Two Text", "Cambria Math", "Times New Roman", serif`;
+const EQ_COL = 470;
+function measure() {
+  layout = LINES.map(L => {
+    const ws = L.toks.map(([s, it]) => { bg.font = fontFor(L.size, it); return bg.measureText(s).width; });
+    const eqI = L.toks.findIndex(t => t[3]);
+    let x = EQ_COL - ws.slice(0, eqI).reduce((a, b) => a + b, 0);
+    const xs = ws.map(w => { const x0 = x; x += w; return [x0, x]; });
+    return { xs, x0: xs[0][0], x1: x };
+  });
+}
+
+function drawBoard(t) {
+  bg.clearRect(0, 0, BW, BH);
+  bg.fillStyle = 'rgba(12, 34, 46, 0.92)'; bg.fillRect(0, 0, BW, BH);
+  bg.strokeStyle = 'rgba(127, 216, 232, 0.07)'; bg.lineWidth = 1;
+  for (let x = 32; x < BW; x += 32) { bg.beginPath(); bg.moveTo(x, 0); bg.lineTo(x, BH); bg.stroke(); }
+  for (let y = 32; y < BH; y += 32) { bg.beginPath(); bg.moveTo(0, y); bg.lineTo(BW, y); bg.stroke(); }
+  bg.font = '500 22px "DM Mono", monospace'; bg.fillStyle = 'rgba(127, 216, 232, 0.8)'; bg.textBaseline = 'alphabetic';
+  bg.fillText('SOLVE FOR', 40, 62); bg.font = fontFor(30, 1); bg.fillText('x', 182, 63);
+  bg.font = '400 18px "DM Mono", monospace'; bg.fillStyle = 'rgba(127, 216, 232, 0.45)'; bg.fillText('LESSON 01 · LINEAR EQUATIONS', 640, 62);
+
+  let latest = -1;
+  LINES.forEach((L, li) => {
+    const p = clamp01((t - L.at) / L.dur); if (p <= 0) return;
+    latest = li;
+    const lay = layout[li], reveal = lay.x0 + (lay.x1 - lay.x0) * p;
+    bg.save(); bg.beginPath(); bg.rect(0, L.y - L.size, reveal + 2, L.size * 1.5); bg.clip();
+    L.toks.forEach(([s, it, col], k) => { bg.font = fontFor(L.size, it); bg.fillStyle = col || L.color || C.ink; bg.fillText(s, lay.xs[k][0], L.y); });
+    bg.restore();
+    if (p < 1) { bg.fillStyle = C.ink; bg.fillRect(reveal + 4, L.y - L.size * 0.7, 3, L.size * 0.8); } // cursor
+  });
+  // marker on the newest line
+  if (latest >= 0) { const L = LINES[latest]; bg.fillStyle = C.coral; bg.beginPath(); bg.moveTo(52, L.y - L.size * 0.45); bg.lineTo(70, L.y - L.size * 0.3); bg.lineTo(52, L.y - L.size * 0.15); bg.fill(); }
+  // cancellations
+  for (const [li, ks, at] of STRIKES) {
+    const p = clamp01((t - at) / 0.5); if (p <= 0 || t < LINES[li].at + LINES[li].dur) continue;
+    const L = LINES[li];
+    bg.strokeStyle = C.coral; bg.lineWidth = 4; bg.lineCap = 'round';
+    for (const k of ks) {
+      const [a, b] = layout[li].xs[k], a2 = a + (L.toks[k][0].startsWith(' ') ? 14 : 0);
+      bg.beginPath(); bg.moveTo(a2, L.y - 4); bg.lineTo(a2 + (b - a2) * p, L.y - L.size * 0.55); bg.stroke();
+    }
+  }
+  // box around the answer
+  const bp = clamp01((t - 25.8) / 0.8);
+  if (bp > 0) {
+    const L = LINES[4], lay = layout[4], x0 = lay.x0 - 24, x1 = lay.x1 + 24, y0 = L.y - L.size * 0.85, y1 = L.y + L.size * 0.3;
+    let left = 2 * (x1 - x0 + y1 - y0) * bp, cx = x0, cy = y0;
+    bg.strokeStyle = C.gold; bg.lineWidth = 4; bg.beginPath(); bg.moveTo(x0, y0);
+    for (const [px, py] of [[x1, y0], [x1, y1], [x0, y1], [x0, y0]]) {
+      const seg = Math.hypot(px - cx, py - cy);
+      if (left < seg) { bg.lineTo(cx + (px - cx) * left / seg, cy + (py - cy) * left / seg); break; }
+      bg.lineTo(px, py); left -= seg; cx = px; cy = py;
+    }
+    bg.stroke();
+  }
+  // check mark
+  const cp = clamp01((t - 32.3) / 0.4);
+  if (cp > 0) {
+    const L = LINES[5], x = layout[5].x1 + 30, y = L.y - 14;
+    bg.strokeStyle = C.green; bg.lineWidth = 6; bg.lineCap = 'round'; bg.lineJoin = 'round'; bg.beginPath();
+    bg.moveTo(x, y);
+    if (cp < 0.35) bg.lineTo(x + 14 * cp / 0.35, y + 14 * cp / 0.35);
+    else { bg.lineTo(x + 14, y + 14); const q = (cp - 0.35) / 0.65; bg.lineTo(x + 14 + 26 * q, y + 14 - 34 * q); }
+    bg.stroke();
+  }
+  boardTex.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------------------
+// Mira: chibi proportions (~3 heads), flat-shaded, ink outlines
+// ---------------------------------------------------------------------------
+const M = {
+  skin: flat(0xf6e2d6), hair: flat(0x181a22, { roughness: 0.45, side: THREE.DoubleSide }), coat: flat(0x262a33),
+  coatDS: flat(0x262a33, { side: THREE.DoubleSide }), trim: flat(0x5a6372), tights: flat(0x15161b), boot: flat(0x0e0f13, { roughness: 0.5 }),
+};
+const mira = new THREE.Group(); mira.position.set(1.35, 0, 0.35); mira.rotation.y = -0.12; scene.add(mira);
+for (const sx of [-1, 1]) {
+  part(new THREE.CylinderGeometry(0.075, 0.06, 0.62, 5), M.tights, mira, sx * 0.13, 0.46, 0);
+  part(new THREE.CylinderGeometry(0.085, 0.1, 0.2, 6), M.boot, mira, sx * 0.13, 0.1, 0.02);
+}
+const body = new THREE.Group(); body.position.y = 0.8; mira.add(body);
+part(new THREE.CylinderGeometry(0.3, 0.52, 0.72, 7), M.coat, body, 0, 0.32, 0);
+part(new THREE.CylinderGeometry(0.305, 0.305, 0.06, 7), M.trim, body, 0, 0.7, 0, 0);
+const torso = part(new THREE.CylinderGeometry(0.27, 0.31, 0.68, 7), M.coat, body, 0, 1.03, 0);
+for (const y of [0.85, 1.05, 1.25]) part(new THREE.IcosahedronGeometry(0.025, 0), M.trim, body, 0, y, 0.285, 0);
+part(new THREE.CylinderGeometry(0.2, 0.25, 0.22, 7, 1, true), M.coatDS, body, 0, 1.44, 0, 0.04); // high collar
+part(new THREE.CylinderGeometry(0.08, 0.09, 0.2, 6), M.skin, body, 0, 1.45, 0, 0);
+for (const sx of [-1, 1]) part(new THREE.IcosahedronGeometry(0.13, 0), M.coat, body, sx * 0.3, 1.3, 0);
+
+// Head: low-poly sphere with a tapered anime jaw
+const headPivot = new THREE.Group(); headPivot.position.y = 1.52; body.add(headPivot);
+const headGeo = new THREE.SphereGeometry(0.5, 12, 9);
+{
+  const p = headGeo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i); if (y >= 0) continue;
+    const f = -y / 0.5;
+    p.setX(i, p.getX(i) * (1 - 0.36 * f)); p.setZ(i, p.getZ(i) * (1 - 0.12 * f) + 0.04 * f); p.setY(i, y * (1 + 0.06 * f));
+  }
+  headGeo.computeVertexNormals();
+}
+const head = part(headGeo, M.skin, headPivot, 0, 0.45, 0, 0.03);
+head.updateMatrixWorld();
+
+// Face features are placed by raycasting onto the faceted head, so they sit flush on each facet
+const faceRay = new THREE.Raycaster();
+function onFace(obj, x, y, push = 0.012) {
+  const probe = new THREE.Mesh(headGeo); probe.updateMatrixWorld();
+  faceRay.set(new THREE.Vector3(x, y, 2), new THREE.Vector3(0, 0, -1));
+  const hit = faceRay.intersectObject(probe)[0];
+  const n = hit.face.normal.clone();
+  obj.position.copy(hit.point).addScaledVector(n, push);
+  obj.lookAt(obj.position.clone().add(n));
+  head.add(obj);
+  return obj;
+}
+const disc = (r, col, sx = 1, sy = 1, seg = 8, extra) => { const m = new THREE.Mesh(new THREE.CircleGeometry(r, seg), basic(col, extra)); m.scale.set(sx, sy, 1); return m; };
+const strip = (w, h, col) => new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.006), basic(col));
+const eyes = [];
+for (const sx of [-1, 1]) {
+  const eye = new THREE.Group();
+  const ball = new THREE.Group(); eye.add(ball);
+  ball.add(disc(0.088, 0xffffff, 1, 1.15));
+  const iris = disc(0.07, 0x5f7fa6, 0.85, 1.2); iris.position.set(-sx * 0.006, -0.006, 0.002); ball.add(iris);
+  const pupil = disc(0.034, 0x18202c, 0.85, 1.2, 6); pupil.position.set(-sx * 0.006, -0.008, 0.004); ball.add(pupil);
+  const hl = disc(0.019, 0xffffff, 1, 1, 6); hl.position.set(sx * 0.02 + 0.006, 0.03, 0.006); ball.add(hl);
+  const lid = strip(0.2, 0.03, 0x15161b); lid.position.set(0, 0.098, 0.006); lid.rotation.z = -sx * 0.12; eye.add(lid);
+  // the blue eyeshadow sweep past the outer corner
+  const shade = strip(0.17, 0.036, 0x3b86d9); shade.position.set(sx * 0.015, 0.128, 0.004); shade.rotation.z = -sx * 0.1; eye.add(shade);
+  const flick = strip(0.1, 0.022, 0x3b86d9); flick.position.set(sx * 0.12, 0.13, 0.004); flick.rotation.z = sx * 0.5; eye.add(flick);
+  const brow = strip(0.12, 0.018, 0x1b1c24); brow.position.set(sx * 0.01, 0.2, 0.004); brow.rotation.z = sx * 0.08; eye.add(brow);
+  onFace(eye, sx * 0.18, -0.04, 0.006);
+  eyes.push(ball);
+}
+for (const sx of [-1, 1]) onFace(disc(0.06, 0xf29aa6, 1.5, 0.6, 8, { transparent: true, opacity: 0.5 }), sx * 0.25, -0.17);
+onFace(strip(0.012, 0.03, 0xd9b4a6), 0, -0.13, 0.004);
+const mouthGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.04, 0.012, 0), new THREE.Vector3(0.04, 0.012, 0), new THREE.Vector3(0, -0.018, 0)]);
+const mouth = onFace(new THREE.Mesh(mouthGeo, basic(0x7a3640, { side: THREE.DoubleSide })), 0, -0.25, 0.008);
+
+// Hair: blunt bob with straight bangs and long front side locks
+{
+  const hg = new THREE.Group(); hg.position.y = 0.45; headPivot.add(hg);
+  part(new THREE.SphereGeometry(0.545, 12, 4, 0, Math.PI * 2, 0, Math.PI * 0.3), M.hair, hg, 0, 0.02, -0.01, 0.03);
+  part(new THREE.SphereGeometry(0.565, 12, 6, Math.PI - 0.55, Math.PI + 1.1, Math.PI * 0.28, Math.PI * 0.44), M.hair, hg, 0, 0.0, -0.01, 0.03);
+  part(new THREE.SphereGeometry(0.56, 12, 3, 0.45, Math.PI - 0.9, Math.PI * 0.12, Math.PI * 0.28), M.hair, hg, 0, 0.0, 0.0, 0.02);
+  const th = Math.PI * 0.4, r = 0.56;
+  for (let k = 0; k < 7; k++) {
+    const ph = 0.75 + k * (Math.PI - 1.5) / 6;
+    const tip = part(new THREE.ConeGeometry(0.04, 0.09, 3), M.hair, hg, -Math.cos(ph) * Math.sin(th) * r, Math.cos(th) * r - 0.035, Math.sin(ph) * Math.sin(th) * r, 0);
+    tip.rotation.x = Math.PI;
+  }
+  for (const sx of [-1, 1]) {
+    const lock = part(new THREE.CylinderGeometry(0.05, 0.09, 0.58, 4), M.hair, hg, sx * 0.44, -0.22, 0.17, 0.04);
+    lock.rotation.set(-0.18, 0, sx * 0.1);
+  }
+}
+
+// Arms (stylus in her right hand)
+function arm(side) {
+  const sh = new THREE.Group(); sh.position.set(side * 0.33, 1.3, 0); body.add(sh);
+  part(new THREE.CylinderGeometry(0.075, 0.065, 0.46, 6), M.coat, sh, 0, -0.23, 0);
+  const el = new THREE.Group(); el.position.y = -0.46; sh.add(el);
+  part(new THREE.CylinderGeometry(0.065, 0.055, 0.42, 6), M.coat, el, 0, -0.21, 0);
+  part(new THREE.CylinderGeometry(0.07, 0.07, 0.05, 6), M.trim, el, 0, -0.39, 0, 0);
+  part(new THREE.IcosahedronGeometry(0.075, 0), M.skin, el, 0, -0.47, 0);
+  return { sh, el };
+}
+const R = arm(-1), L = arm(1);
+part(new THREE.CylinderGeometry(0.014, 0.014, 0.42, 5), flat(0xdfe6ee, { metalness: 0.5, roughness: 0.3 }), R.el, 0, -0.66, 0.02, 0.06);
+const tip = new THREE.Mesh(new THREE.IcosahedronGeometry(0.03, 0), basic(0x7fd8e8)); tip.position.set(0, -0.88, 0.02); R.el.add(tip);
+
+// Sparkles for the answer
+const sparkles = [];
+for (let i = 0; i < 16; i++) {
+  const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), basic(i % 3 ? 0xffd27a : 0x7fd8e8));
+  s.userData.dir = new THREE.Vector3((rng() - 0.5) * 2.2, rng() * 1.4 + 0.2, rng() * 1.2 + 0.3); s.visible = false; scene.add(s);
+  sparkles.push(s);
+}
+const answerOrigin = new THREE.Vector3();
+
+// ---------------------------------------------------------------------------
+// Evaluate the whole scene at time t
+// ---------------------------------------------------------------------------
+const pose = {};
+function poseAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t >= KEYS[i + 1][0]) i++;
+  const [t0, a] = KEYS[i], [t1, b] = KEYS[i + 1], u = ease(clamp01((t - t0) / (t1 - t0)));
+  for (const k in POSES.idle) pose[k] = POSES[a][k] + (POSES[b][k] - POSES[a][k]) * u;
+  return pose;
+}
+const camPos = new THREE.Vector3(), camTarget = new THREE.Vector3(), tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+function camAt(t) {
+  let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++;
+  const [t0, p0, q0] = CAM[i], [t1, p1, q1] = CAM[i + 1], u = ease(clamp01((t - t0) / (t1 - t0)));
+  camPos.lerpVectors(tmpA.fromArray(p0), tmpB.fromArray(p1), u);
+  camTarget.lerpVectors(tmpA.fromArray(q0), tmpB.fromArray(q1), u);
+  if (!reduceMotion) { camPos.x += Math.sin(t * 0.35) * 0.12; camPos.y += Math.sin(t * 0.27) * 0.05; }
+  const k = Math.max(1, 1.5 / camera.aspect); // pull back on portrait screens so the board and Mira both fit
+  camPos.sub(camTarget).multiplyScalar(k).add(camTarget);
+  camera.position.copy(camPos); camera.lookAt(camTarget);
+}
+function speaking(t) {
+  for (const [a, b, txt] of CAPTIONS) if (t >= a && t < b) return clamp01((t - a) / typeDur(a, b, txt)) < 1;
+  return false;
+}
+const typeDur = (a, b, txt) => Math.min(txt.length * 0.045, (b - a) * 0.75);
+
+function render(t) {
+  const p = poseAt(t);
+  let nod = 0; for (const n of NODS) nod += bump(t - n, 0.6) * 0.18;
+  body.rotation.set(p.bX, p.bY, p.bZ + Math.sin(t * 1.3) * 0.015);
+  headPivot.rotation.set(p.hX + nod, p.hY, p.hZ + Math.sin(t * 0.9) * 0.02);
+  R.sh.rotation.set(p.rX, 0, p.rZ); R.el.rotation.set(p.rE, 0, p.rEz + p.wave * Math.sin(t * 9) * 0.45);
+  L.sh.rotation.set(p.lX, 0, p.lZ); L.el.rotation.set(p.lE, 0, p.lEz);
+  torso.scale.y = 1 + Math.sin(t * 2.2) * 0.012;
+  mira.position.y = bump(t - 24.95, 0.45) * 0.18 + bump(t - 25.45, 0.4) * 0.1;
+  const blink = (t % 3.7) < 0.12 || Math.abs(t - 14.1) < 0.06 ? 0.12 : 1;
+  eyes.forEach(e => { e.scale.y = blink; });
+  mouth.scale.set(1, speaking(t) ? 1 + 2.2 * Math.abs(Math.sin(t * 17)) : 1, 1);
+
+  const sp = t - 25.0;
+  if (sp > 0 && sp < 2.4) {
+    answerOrigin.set((EQ_COL / BW - 0.5) * BOARD_W, (0.5 - (LINES[4].y - 30) / BH) * BOARD_H, 0.1); board.localToWorld(answerOrigin);
+    sparkles.forEach((s, i) => {
+      const d = s.userData.dir, e = 1 - Math.pow(1 - sp / 2.4, 2);
+      s.visible = true; s.position.copy(answerOrigin).addScaledVector(d, e * 1.1); s.position.y -= sp * sp * 0.12;
+      s.rotation.set(sp * 4 + i, sp * 3, 0); s.scale.setScalar(Math.max(0.01, 1 - sp / 2.4) * (1 + 0.4 * Math.sin(sp * 10 + i)));
+    });
+  } else sparkles.forEach(s => { s.visible = false; });
+
+  drawBoard(t);
+  camAt(t);
+}
+
+// ---------------------------------------------------------------------------
+// Captions & controls
+// ---------------------------------------------------------------------------
+const captionEl = document.getElementById('caption'), lineEl = document.getElementById('line'), liveEl = document.getElementById('live');
+let capIndex = -2, capSpans = [];
+function buildCaption(i) {
+  lineEl.replaceChildren(); capSpans = [];
+  if (i < 0) return;
+  CAPTIONS[i][2].split('*').forEach((seg, k) => {
+    for (const ch of seg) { const s = document.createElement('span'); s.textContent = ch; if (k % 2) s.className = 'm'; lineEl.appendChild(s); capSpans.push(s); }
+  });
+  liveEl.textContent = CAPTIONS[i][2].replaceAll('*', '');
+}
+function updateCaption(t) {
+  const i = CAPTIONS.findIndex(([a, b]) => t >= a && t < b);
+  if (i !== capIndex) { capIndex = i; buildCaption(i); }
+  captionEl.classList.toggle('quiet', i < 0);
+  if (i < 0) return;
+  const [a, b, txt] = CAPTIONS[i], n = Math.floor(capSpans.length * clamp01((t - a) / typeDur(a, b, txt)));
+  capSpans.forEach((s, k) => s.classList.toggle('on', k < n));
+}
+
+const scrub = document.getElementById('scrub'), timeEl = document.getElementById('time'), playBtn = document.getElementById('play'), playIcon = document.getElementById('playIcon');
+const ticks = document.getElementById('ticks');
+CHAPTERS.forEach(([at, name]) => { const s = document.createElement('span'); s.className = 'tick'; s.style.left = `${at / DUR * 100}%`; s.textContent = name; ticks.appendChild(s); });
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const ICON_PAUSE = '<rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/>';
+const ICON_PLAY = '<path d="M4 2.2v11.6a.8.8 0 0 0 1.2.7l9-5.8a.8.8 0 0 0 0-1.4l-9-5.8A.8.8 0 0 0 4 2.2z"/>';
+let t = 0, playing = true;
+function setPlaying(v) {
+  playing = v;
+  playIcon.innerHTML = v ? ICON_PAUSE : ICON_PLAY;
+  playBtn.setAttribute('aria-label', v ? 'Pause' : (t >= DUR ? 'Replay' : 'Play'));
+}
+playBtn.addEventListener('click', () => { if (t >= DUR) t = 0; setPlaying(!playing); });
+document.getElementById('restart').addEventListener('click', () => { t = 0; setPlaying(true); });
+scrub.addEventListener('input', () => { t = parseFloat(scrub.value); });
+addEventListener('keydown', e => {
+  if (e.target === scrub) return;
+  if (e.code === 'Space') { e.preventDefault(); playBtn.click(); }
+  if (e.code === 'KeyR') { t = 0; setPlaying(true); }
+});
+
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(canvas); resize();
+
+measure();
+Promise.race([
+  Promise.all(['500 62px "STIX Two Text"', 'italic 500 62px "STIX Two Text"', '500 22px "DM Mono"'].map(f => document.fonts.load(f))),
+  new Promise(r => setTimeout(r, 2500)),
+]).then(() => measure()).catch(() => {});
+
+const clock = new THREE.Clock();
+let first = true;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  if (playing) { t += dt; if (t >= DUR) { t = DUR; setPlaying(false); } }
+  scrub.value = t; timeEl.textContent = `${fmt(t)} / ${fmt(DUR)}`;
+  render(t); updateCaption(t);
+  renderer.render(scene, camera);
+  if (first) { first = false; document.getElementById('loading').classList.add('done'); }
+});
+</script>
+</body>
+</html>
